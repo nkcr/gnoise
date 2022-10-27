@@ -1,3 +1,3 @@
 .PHONY: wasm
 wasm:
-	GOOS=js GOARCH=wasm go build -o ./web/assets/halftone.wasm ./wasm/
+	GOOS=js GOARCH=wasm go build -o ./docs/assets/halftone.wasm ./wasm/
