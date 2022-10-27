@@ -1,4 +1,4 @@
-package main
+package halftone
 
 import (
 	"bytes"
@@ -8,54 +8,53 @@ import (
 	"os"
 )
 
-// processing function that render points
-type proc func(w io.Writer, width, height, startRadius float64, ease ease)
+// Proc is a processing function that render points
+type Proc func(w io.Writer, width, height, startRadius float64, ease Ease)
 
-// ease function to parametrize the radius evolution
-type ease func(float64) float64
+// Ease is an ease function to parametrize the radius evolution
+type Ease func(float64) float64
 
 // main options, would be a good idea to set them as flags
-type opts struct {
-	width  float64
-	height float64
-	radius float64
-	fill   string
-	output string
-	proc   proc
-	ease   ease
+type Opts struct {
+	Width  float64
+	Height float64
+	Radius float64
+	Fill   string
+	Proc   Proc
+	Ease   Ease
 }
 
-func main() {
-	opts := opts{
-		width:  300.0,
-		height: 300.0,
-		radius: 3.0,
-		fill:   "#44FF44",
-		output: "result.svg",
-		proc:   gradientCompact,
-		ease:   easeLinear,
+func RenderFile(opts Opts, filename string) error {
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0744)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %v", err)
 	}
 
-	render(opts)
+	defer f.Close()
+
+	render(f, opts)
+
+	return nil
 }
 
-func render(opts opts) {
+func RenderStr(opts Opts) string {
 	w := &bytes.Buffer{}
 
-	fmt.Fprintf(w, `<svg viewBox="0 0 %.1f %f.1" xmlns="http://www.w3.org/2000/svg">`, opts.width, opts.height)
-	fmt.Fprintf(w, `<g fill="%s">`, opts.fill)
-	opts.proc(w, opts.width, opts.height, opts.radius, opts.ease)
-	fmt.Fprint(w, "</g>")
-	fmt.Fprint(w, `</svg>`)
+	render(w, opts)
 
-	err := os.WriteFile(opts.output, w.Bytes(), 0744)
-	if err != nil {
-		panic(err)
-	}
+	return w.String()
 }
 
-// gradientCompact stacks circles leaving the smallest gap possible.
-func gradientCompact(w io.Writer, width, height, startRadius float64, ease ease) {
+func render(w io.Writer, opts Opts) {
+	fmt.Fprintf(w, `<svg viewBox="0 0 %.1f %.1f" xmlns="http://www.w3.org/2000/svg" id="svg">`, opts.Width, opts.Height)
+	fmt.Fprintf(w, `<g fill="%s">`, opts.Fill)
+	opts.Proc(w, opts.Width, opts.Height, opts.Radius, opts.Ease)
+	fmt.Fprint(w, "</g>")
+	fmt.Fprint(w, `</svg>`)
+}
+
+// GradientCompact stacks circles leaving the smallest gap possible.
+func GradientCompact(w io.Writer, width, height, startRadius float64, ease Ease) {
 	// linHeight is the height of stack of 3 congruent semicircles
 	lineHeight := startRadius * math.Sqrt(3)
 
@@ -85,9 +84,9 @@ func gradientCompact(w io.Writer, width, height, startRadius float64, ease ease)
 	}
 }
 
-// gradientSquared puts each circle on a square, making them touch only on a
+// GradientSquared puts each circle on a square, making them touch only on a
 // diagonal.
-func gradientSquared(w io.Writer, width, height, startRadius float64, ease ease) {
+func GradientSquared(w io.Writer, width, height, startRadius float64, ease Ease) {
 	// r*sqrt(2) is the size of a square that contains the circle
 	numLines := height / (startRadius * math.Sqrt2)
 	numCols := width / (startRadius * math.Sqrt2)
@@ -119,34 +118,34 @@ func gradientSquared(w io.Writer, width, height, startRadius float64, ease ease)
 // Ease functions to adjust the radius size evolution. Taken from
 // https://github.com/fogleman/ease.
 
-func easeOutCirc(t float64) float64 {
+func EaseOutCirc(t float64) float64 {
 	t--
 	return math.Sqrt(1 - (t * t))
 }
 
-func easeOutExpo(t float64) float64 {
+func EaseOutExpo(t float64) float64 {
 	if t == 1 {
 		return 1
 	}
 	return 1 - math.Pow(2, -10*t)
 }
 
-func easeInExpo(t float64) float64 {
+func EaseInExpo(t float64) float64 {
 	if t == 0 {
 		return 0
 	}
 	return math.Pow(2, 10*(t-1))
 }
 
-func easeInQuad(t float64) float64 {
+func EaseInQuad(t float64) float64 {
 	return t * t
 }
 
-func easeLinear(t float64) float64 {
+func EaseLinear(t float64) float64 {
 	return t
 }
 
-func easeInOutQuad(t float64) float64 {
+func EaseInOutQuad(t float64) float64 {
 	if t < 0.5 {
 		return 2 * t * t
 	}
@@ -154,7 +153,7 @@ func easeInOutQuad(t float64) float64 {
 	return -0.5 * (t*(t-2) - 1)
 }
 
-func easeInOutQuart(t float64) float64 {
+func EaseInOutQuart(t float64) float64 {
 	t *= 2
 	if t < 1 {
 		return 0.5 * t * t * t * t
